@@ -612,6 +612,8 @@ window.addEventListener('resize', () => {
 const _v3 = new THREE.Vector3();
 const _tgt = new THREE.Vector3();
 const _emis = new THREE.Color();
+const _zero = new THREE.Vector3(0, 0, 0);
+const BRAIN_R = TARGET_R;            // brain bounding radius (set when the model loads)
 function projectLocal(localVec) {
   _v3.copy(localVec).applyMatrix4(brain.matrixWorld).project(camera);
   return { x: (_v3.x*0.5+0.5)*window.innerWidth, y: (-_v3.y*0.5+0.5)*window.innerHeight, z: _v3.z };
@@ -673,31 +675,53 @@ let hoveredIdx = -1;
   });
 
   const panelOpen = panel.classList.contains('open');
-  const rightEdge = (panelOpen ? window.innerWidth - 360 : window.innerWidth) - 24;
-  const leftEdge = 24;
+  const rightBound = (panelOpen ? window.innerWidth - 360 : window.innerWidth) - 14;
   const topBound = 210, botBound = window.innerHeight - 40, gap = 10;
-  const centerX = items.length ? items.reduce((s, it) => s + it.ax, 0) / items.length : window.innerWidth / 2;
+
+  // Brain's on-screen horizontal extent → place the columns just outside it.
+  const cx = projectLocal(_zero).x;
+  const dist = Math.abs(camera.position.z);
+  const screenR = BRAIN_R * (window.innerHeight / 2) / (Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * dist);
+  const brainLeft = cx - screenR, brainRight = cx + screenR, sideMargin = 28;
+  const centerX = cx;
 
   // Split into a left and right column by which side of the brain each region is on.
   const cols = { L: [], R: [] };
   items.forEach(it => cols[it.ax < centerX ? 'L' : 'R'].push(it));
 
+  // Hero text box to keep labels clear of (with padding).
+  const heroEl = document.querySelector('.hero');
+  const hr = heroEl ? heroEl.getBoundingClientRect() : null;
+  const heroPad = 14;
+
   ['L', 'R'].forEach(side => {
     const col = cols[side];
+    // Column x first (it doesn't depend on y), then per-label floor that keeps
+    // any label whose box would overlap the hero text below that text.
+    col.forEach(it => {
+      it.lx = side === 'L'
+        ? Math.max(12 + it.w/2, brainLeft - sideMargin - it.w/2)
+        : Math.min(rightBound - it.w/2, brainRight + sideMargin + it.w/2);
+      let floor = topBound;
+      if (hr) {
+        const overlapsHeroX = (it.lx + it.w/2) > (hr.left - heroPad) && (it.lx - it.w/2) < (hr.right + heroPad);
+        if (overlapsHeroX) floor = Math.max(floor, hr.bottom + heroPad + it.h/2);
+      }
+      it.floor = floor;
+    });
+
     col.sort((a, b) => a.ay - b.ay);
-    for (let k = 0; k < col.length; k++) {                       // push down off overlaps
-      let y = col[k].ay;
+    for (let k = 0; k < col.length; k++) {                       // push down off overlaps + hero
+      let y = Math.max(col[k].ay, col[k].floor);
       if (k > 0) y = Math.max(y, col[k-1].ly + col[k-1].h/2 + gap + col[k].h/2);
       col[k].ly = y;
     }
     for (let k = col.length - 1; k >= 0; k--) {                  // keep within bottom edge
       let y = Math.min(col[k].ly, botBound - col[k].h/2);
       if (k < col.length - 1) y = Math.min(y, col[k+1].ly - col[k+1].h/2 - gap - col[k].h/2);
-      col[k].ly = Math.max(y, topBound + col[k].h/2);
+      col[k].ly = Math.max(y, col[k].floor);
     }
     col.forEach(it => {
-      // Flush labels to the column edge (left edge at leftEdge / right edge at rightEdge).
-      it.lx = side === 'L' ? leftEdge + it.w/2 : rightEdge - it.w/2;
       const el = it.el;
       el.style.left = it.lx + 'px';
       el.style.top = it.ly + 'px';
