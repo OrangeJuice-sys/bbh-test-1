@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Big Brain Holdings</title>
+<link rel="icon" type="image/svg+xml" href="brain-logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Cormorant+Garamond:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --sans: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --serif: 'Cormorant Garamond', Georgia, serif;
+  }
+
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: radial-gradient(circle at 58% 46%, #f3f3f4 0%, #e4e4e6 46%, #d2d2d6 78%, #c2c2c7 100%);
+    color: #1d1d1f;
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Navigation ── */
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 48px;
+    z-index: 30;
+    background: rgba(248, 248, 250, 0.72);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: #1d1d1f;
+    text-decoration: none;
+    user-select: none;
+  }
+
+  .logo img {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+  }
+
+  .nav-links {
+    display: flex;
+    gap: 8px;
+    list-style: none;
+  }
+
+  .nav-links a {
+    color: rgba(0,0,0,0.55);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    padding: 7px 16px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    transition: color 0.2s, border-color 0.2s, background 0.2s;
+  }
+
+  .nav-links a:hover {
+    color: #000;
+    border-color: rgba(0,0,0,0.14);
+    background: rgba(0,0,0,0.04);
+  }
+
+  /* ── 3D Canvas ── */
+  #canvas-container {
+    position: fixed;
+    inset: 0;
+    cursor: grab;
+  }
+  #canvas-container:active { cursor: grabbing; }
+
+  /* ── Brain Labels ── */
+  #labels {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  .label {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 11px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    pointer-events: auto;
+    cursor: pointer;
+    transition: opacity 0.3s;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid var(--c-border);
+    color: #1d1d1f;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+  }
+  .label-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--c-text);
+    box-shadow: 0 0 8px var(--c-glow);
+    flex-shrink: 0;
+  }
+
+  /* ── Hero copy ── */
+  .hero {
+    position: fixed;
+    top: 110px;
+    left: 48px;
+    max-width: 420px;
+    z-index: 10;
+    pointer-events: none;
+    user-select: none;
+  }
+  .hero h1 {
+    font-family: var(--serif);
+    font-size: 40px;
+    line-height: 1.22;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    color: #161617;
+    margin-bottom: 18px;
+  }
+  .hero p {
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    font-weight: 400;
+    color: rgba(0,0,0,0.55);
+  }
+  @media (max-width: 760px) {
+    .hero { top: 88px; left: 24px; right: 24px; max-width: none; }
+    .hero h1 { font-size: 30px; }
+    .hero p { font-size: 13px; }
+  }
+
+  /* ── Hint ── */
+  .hint {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: rgba(0,0,0,0.32);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    z-index: 10;
+    pointer-events: none;
+    user-select: none;
+    text-transform: uppercase;
+    transition: opacity 0.3s;
+  }
+
+  /* ── Portfolio Panel ── */
+  #panel {
+    position: fixed;
+    top: 64px;
+    right: 0;
+    bottom: 0;
+    width: 360px;
+    max-width: 88vw;
+    z-index: 25;
+    background: rgba(249, 249, 251, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-left: 1px solid var(--p-border, rgba(0,0,0,0.1));
+    transform: translateX(100%);
+    transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+    display: flex;
+    flex-direction: column;
+    padding: 32px 30px;
+  }
+  #panel.open { transform: translateX(0); }
+
+  .panel-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+  .panel-swatch {
+    width: 12px; height: 12px;
+    background: var(--p-color);
+    box-shadow: 0 0 14px var(--p-color);
+    flex-shrink: 0;
+  }
+  #panel-title {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: #161617;
+  }
+  #panel-count {
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(0,0,0,0.4);
+    margin-bottom: 22px;
+    margin-left: 22px;
+  }
+  #panel-close {
+    position: absolute;
+    top: 26px; right: 26px;
+    width: 30px; height: 30px;
+    display: flex; align-items: center; justify-content: center;
+    background: none;
+    border: 1px solid rgba(0,0,0,0.14);
+    border-radius: 6px;
+    color: rgba(0,0,0,0.55);
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  #panel-close:hover { color: #000; border-color: rgba(0,0,0,0.35); }
+
+  #panel-list {
+    list-style: none;
+    overflow-y: auto;
+    flex: 1;
+    margin: 0 -6px;
+  }
+  #panel-list li {
+    padding: 11px 12px;
+    font-size: 14px;
+    font-weight: 500;
+    color: rgba(0,0,0,0.8);
+    border-radius: 6px;
+    border-bottom: 1px solid rgba(0,0,0,0.07);
+    transition: background 0.18s, color 0.18s, padding-left 0.18s;
+    cursor: default;
+  }
+  #panel-list li:hover {
+    background: rgba(0,0,0,0.04);
+    color: #000;
+    padding-left: 18px;
+  }
+  #panel-list::-webkit-scrollbar { width: 6px; }
+  #panel-list::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.18); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="#" class="logo">
+    <img src="brain-logo-dark.svg" alt="Big Brain Holdings">
+    Big Brain Holdings
+  </a>
+  <ul class="nav-links">
+    <li><a href="#">Team</a></li>
+    <li><a href="#">Writing</a></li>
+    <li><a href="#">Contact</a></li>
+  </ul>
+</nav>
+
+<div class="hero">
+  <h1>Backing visionaries and builders at the technological frontier</h1>
+  <p>Big Brain Holdings is a global multi-stage investment firm backing funds and founders accelerating emerging frontiers in technology. Rooted in cypherpunk, we back conviction and visionaries pursuing radical ideas.</p>
+</div>
+
+<div id="canvas-container"></div>
+<div id="labels"></div>
+<p class="hint" id="hint">Drag to rotate · Click a region</p>
+
+<!-- Portfolio panel -->
+<aside id="panel">
+  <button id="panel-close" aria-label="Close">✕</button>
+  <div class="panel-head">
+    <span class="panel-swatch"></span>
+    <h2 id="panel-title">Category</h2>
+  </div>
+  <div id="panel-count">0 companies</div>
+  <ul id="panel-list"></ul>
+</aside>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { mergeVertices } from 'https://unpkg.com/three@0.160.0/examples/jsm/utils/BufferGeometryUtils.js';
+import { STLLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/STLLoader.js';
+
+// ── Categories → anatomical brain regions (colour-coded like the reference) ──
+const lobes = [
+  { name: 'AI',               region: 'frontal',    hex: 0x32d6e6, companies: ['FortyTwo','Antigma','Ambient','Wayfinder','Ritual'] },
+  { name: 'Robotics',         region: 'parietal',   hex: 0x5fd83a, companies: ['Dyna Robotics','Apptronik','Personal AI','Agility Robotics','Daxo Robotics','Bitrobot','Nirvana AI','Youmio'] },
+  { name: 'Crypto',           region: 'temporal',   hex: 0x2bbfa6, companies: ['Solana','Mysten Labs','NEAR Protocol','Sphere','Flashbots','Magna','Monad','Avalanche','MegaETH','Utexo','Arweave','Wormhole','The Graph','Stacks','Solayer','Initia','Helius','Bulk','IKA','Crossmint','Argument','Nubit','Bio Protocol','Raiku','Reflect','Arch Network','Nillion','Inco','Octra','Hemi','Panoptic','AVNU'] },
+  { name: 'Consumer',         region: 'occipital',  hex: 0x9b5cf0, companies: ['Pump.fun','Enhanced Games','Kash','Pudgy Penguins','Tensor','Parallel Life','Legend','ZarPay','Collector Crypt','Collective Memory','GTE','Sphinx','Sweatcoin','LEVR'] },
+  { name: 'Deeptech',         region: 'cerebellum', hex: 0xf25a4a, companies: ['Vulcan Elements','Mach Industries','Teralink'] },
+  { name: 'Advanced Compute', region: 'brainstem',  hex: 0xf2c63f, companies: ['Ahead Computing','Tsavorite'] },
+  { name: 'Data / AI Infra',  region: 'insula',     hex: 0x3f72e6, companies: ['Grass','Hyperbolic','Yotta Labs','Exo Labs','Perle AI','Aethir','Inference Labs','FrodoBots','Wynd','Exabits','Akave','USD AI'] },
+];
+const N = lobes.length;
+const regionOf = {};
+lobes.forEach((l, i) => { regionOf[l.region] = i; });
+
+// ── Renderer ──────────────────────────────────────────────────────────────
+const container = document.getElementById('canvas-container');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+container.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(46, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(0, 0.05, 6.6);
+
+// ── Lights (soft, neutral studio light for a realistic beige brain) ───────
+scene.add(new THREE.HemisphereLight(0xffffff, 0xb9b2a6, 0.95));
+const key = new THREE.DirectionalLight(0xffffff, 0.85);
+key.position.set(3, 5, 4); scene.add(key);
+const fill = new THREE.DirectionalLight(0xffffff, 0.45);
+fill.position.set(-4, 1, -3); scene.add(fill);
+const rim = new THREE.DirectionalLight(0xffffff, 0.35);
+rim.position.set(0, 4, -5); scene.add(rim);
+
+// ── Brain group ──────────────────────────────────────────────────────────
+const brain = new THREE.Group();
+scene.add(brain);
+
+const R = 1.55;
+
+// Organic gyri/sulci via domain-warped layered waves (brain-like wrinkles).
+// Smooth normals let us push the folds deeper without faceting.
+function displace(nx, ny, nz) {
+  const wx = Math.sin(ny * 3.1 + nz * 2.3);
+  const wy = Math.sin(nz * 3.3 + nx * 2.1);
+  const wz = Math.sin(nx * 2.9 + ny * 2.7);
+  // ridged creases (|sin| dips) read as sulci
+  const ridge = (a) => 0.5 - Math.abs(Math.sin(a) * 0.5 - 0.25) - 0.25;
+  return (
+    0.055 * Math.sin(nx * 6.5 + wx * 1.8) +
+    0.05  * Math.sin(ny * 7.0 + wy * 1.8) +
+    0.045 * Math.sin(nz * 6.5 + wz * 1.8) +
+    0.05  * ridge(nx * 10.0 + ny * 8.0 + wz * 2.0) +
+    0.04  * ridge(nz * 12.0 + nx * 7.0 + wx * 2.0) +
+    0.03  * ridge(ny * 15.0 + nz * 11.0 + wy * 2.0)
+  );
+}
+
+// Brain proportions: longer front-to-back (z) than tall, slightly narrow (x).
+const EX = 0.92, EY = 1.0, EZ = 1.28;
+
+// Shape one vertex direction → final brain-surface position.
+function shape(nx, ny, nz) {
+  const r = R + displace(nx, ny, nz) * R;
+  let px = nx * r, py = ny * r, pz = nz * r;
+  px *= EX; py *= EY; pz *= EZ;
+  if (py < 0) py *= 0.82;                 // flatten the underside a touch
+  return [px, py, pz];
+}
+
+const meshes = [];                       // raycast targets
+const wedges = new Array(N);             // per-region state (indexed by category)
+
+// Neutral beige anatomical material; only tints to the region colour when
+// hovered / selected (like the Neurotorium atlas).
+const BEIGE = new THREE.Color(0xd9c7a8);
+const NOEMIT = new THREE.Color(0x000000);
+function regionMaterial(hex) {
+  const m = new THREE.MeshStandardMaterial({
+    color: BEIGE.clone(),
+    emissive: NOEMIT.clone(),
+    roughness: 0.92, metalness: 0.0,
+  });
+  m.userData.accent = new THREE.Color(hex);
+  return m;
+}
+
+// Register a region as interactive: pop-out group + glow highlight.
+function addRegion(key, grp, mesh, anchor) {
+  const idx = regionOf[key];
+  mesh.userData.idx = idx;
+  meshes.push(mesh);
+  wedges[idx] = { grp, mat: mesh.material, anchor, explode: anchor.clone().normalize(), base: grp.position.clone() };
+}
+
+// ── Load the brain model (STL), centre/scale/orient, weld + smooth, then
+//    split it into the seven anatomical regions by position. ────────────────
+
+// Orientation + classification tuning (adjusted after viewing the model).
+const MODEL_ROT = [-Math.PI / 2, 0, 0];   // STL is usually Z-up → make it Y-up
+const TARGET_R = R * 1.2;
+
+// Classify a point (normalised to roughly [-1,1] per axis) into a region.
+// up = +y, front = +z.
+function regionAt(nx, ny, nz) {
+  if (ny < -0.45 && Math.abs(nx) < 0.32 && nz < 0.25) return 'brainstem';   // hangs down, centre
+  if (ny < -0.10 && nz < -0.25) return 'cerebellum';                        // back-bottom bulge
+  if (nz < -0.32) return 'occipital';                                       // back
+  if (ny > 0.28)  return 'parietal';                                        // top
+  if (ny < -0.18) return 'temporal';                                        // lower side
+  if (Math.abs(nx) > 0.55 && Math.abs(ny) < 0.3 && Math.abs(nz) < 0.35) return 'insula'; // lateral centre
+  return 'frontal';                                                         // front
+}
+
+const REGION_KEYS = ['frontal','parietal','temporal','occipital','cerebellum','brainstem','insula'];
+
+new STLLoader().load('brain.stl', (geo) => {
+  // Centre, scale to fit, orient.
+  geo.center();
+  geo.computeBoundingSphere();
+  const s = TARGET_R / geo.boundingSphere.radius;
+  geo.scale(s, s, s);
+  geo.rotateX(MODEL_ROT[0]); geo.rotateY(MODEL_ROT[1]); geo.rotateZ(MODEL_ROT[2]);
+  geo.center();
+
+  // Weld duplicate STL vertices → smooth, seamless shading.
+  const merged = mergeVertices(geo);
+  merged.computeVertexNormals();
+  const cp = merged.attributes.position;
+  const cn = merged.attributes.normal;
+  const cidx = merged.index;
+
+  // Normalisation extents (half-sizes) for position classification.
+  merged.computeBoundingBox();
+  const bb = merged.boundingBox;
+  const hx = Math.max(1e-3, (bb.max.x - bb.min.x) / 2);
+  const hy = Math.max(1e-3, (bb.max.y - bb.min.y) / 2);
+  const hz = Math.max(1e-3, (bb.max.z - bb.min.z) / 2);
+
+  const verts = {}, norms = {}, acc = {}, cnt = {};
+  REGION_KEYS.forEach(k => { verts[k] = []; norms[k] = []; acc[k] = new THREE.Vector3(); cnt[k] = 0; });
+
+  const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _cen = new THREE.Vector3();
+  for (let t = 0; t < cidx.count; t += 3) {
+    const i0 = cidx.getX(t), i1 = cidx.getX(t+1), i2 = cidx.getX(t+2);
+    _a.set(cp.getX(i0), cp.getY(i0), cp.getZ(i0));
+    _b.set(cp.getX(i1), cp.getY(i1), cp.getZ(i1));
+    _c.set(cp.getX(i2), cp.getY(i2), cp.getZ(i2));
+    _cen.copy(_a).add(_b).add(_c).multiplyScalar(1/3);
+    const key = regionAt(_cen.x / hx, _cen.y / hy, _cen.z / hz);
+    for (const vi of [i0, i1, i2]) {
+      verts[key].push(cp.getX(vi), cp.getY(vi), cp.getZ(vi));
+      norms[key].push(cn.getX(vi), cn.getY(vi), cn.getZ(vi));
+    }
+    acc[key].add(_cen); cnt[key]++;
+  }
+
+  REGION_KEYS.forEach(key => {
+    if (cnt[key] === 0) return;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(verts[key], 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(norms[key], 3));
+    const grp = new THREE.Group();
+    brain.add(grp);
+    const mesh = new THREE.Mesh(g, regionMaterial(lobes[regionOf[key]].hex));
+    grp.add(mesh);
+    addRegion(key, grp, mesh, acc[key].multiplyScalar(1 / cnt[key]));
+  });
+});
+
+// Resting orientation: 3/4 side view (NO auto-spin)
+brain.rotation.set(-0.12, -0.6, 0);
+
+// ── HTML Labels (monochrome) ──────────────────────────────────────────────
+const labelsRoot = document.getElementById('labels');
+const labelEls = lobes.map((l, i) => {
+  const el = document.createElement('div');
+  el.className = 'label';
+  const hexStr = '#' + l.hex.toString(16).padStart(6, '0');
+  el.style.setProperty('--c-text', '#ffffff');
+  el.style.setProperty('--c-border', hexStr);
+  el.style.setProperty('--c-glow', hexStr);
+  const dot = document.createElement('div'); dot.className = 'label-dot';
+  el.appendChild(dot);
+  el.appendChild(document.createTextNode(l.name));
+  el.addEventListener('click', (e) => { e.stopPropagation(); openPanel(i); });
+  labelsRoot.appendChild(el);
+  return el;
+});
+
+// ── Panel logic ───────────────────────────────────────────────────────────
+const panel      = document.getElementById('panel');
+const panelTitle = document.getElementById('panel-title');
+const panelCount = document.getElementById('panel-count');
+const panelList  = document.getElementById('panel-list');
+const hintEl     = document.getElementById('hint');
+let activeIdx = -1;
+
+function openPanel(i) {
+  const l = lobes[i];
+  activeIdx = i;
+  panelTitle.textContent = l.name;
+  panelCount.textContent = l.companies.length + (l.companies.length === 1 ? ' company' : ' companies');
+  panel.style.setProperty('--p-color', '#ffffff');
+  panel.style.setProperty('--p-border', 'rgba(255,255,255,0.4)');
+  panelList.innerHTML = '';
+  l.companies.forEach(co => {
+    const li = document.createElement('li');
+    li.textContent = co;
+    panelList.appendChild(li);
+  });
+  panel.classList.add('open');
+  hintEl.style.opacity = '0';
+}
+function closePanel() {
+  panel.classList.remove('open');
+  activeIdx = -1;
+  hintEl.style.opacity = '1';
+}
+document.getElementById('panel-close').addEventListener('click', closePanel);
+
+// ── Pointer / Drag / Click ─────────────────────────────────────────────────
+const mouse = new THREE.Vector2(-9, -9);
+let isDragging = false, moved = false;
+let prev = { x: 0, y: 0 };
+let velY = 0, velX = 0;
+
+function onDown(x, y) { isDragging = true; moved = false; prev = { x, y }; }
+function onUp() { isDragging = false; }
+function onMove(x, y) {
+  if (isDragging) {
+    const dx = x - prev.x, dy = y - prev.y;
+    if (Math.abs(dx) + Math.abs(dy) > 3) moved = true;
+    velY = dx * 0.011; velX = dy * 0.011;
+    brain.rotation.y += velY;
+    brain.rotation.x = THREE.MathUtils.clamp(brain.rotation.x + velX, -1.0, 1.0);
+    prev = { x, y };
+  }
+  mouse.set((x / window.innerWidth) * 2 - 1, -(y / window.innerHeight) * 2 + 1);
+}
+
+const elc = renderer.domElement;
+elc.addEventListener('mousedown', e => onDown(e.clientX, e.clientY));
+window.addEventListener('mouseup', onUp);
+window.addEventListener('mousemove', e => onMove(e.clientX, e.clientY));
+elc.addEventListener('touchstart', e => onDown(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+window.addEventListener('touchend', onUp);
+window.addEventListener('touchmove', e => onMove(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+
+const raycaster = new THREE.Raycaster();
+
+elc.addEventListener('click', () => {
+  if (moved) return;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(meshes);
+  if (hits.length > 0) openPanel(hits[0].object.userData.idx);
+  else closePanel();
+});
+
+// ── Resize ──────────────────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ── Projection + facing helpers ─────────────────────────────────────────
+const _v3 = new THREE.Vector3();
+const _tgt = new THREE.Vector3();
+const _emis = new THREE.Color();
+function projectLocal(localVec) {
+  _v3.copy(localVec).applyMatrix4(brain.matrixWorld).project(camera);
+  return { x: (_v3.x*0.5+0.5)*window.innerWidth, y: (-_v3.y*0.5+0.5)*window.innerHeight, z: _v3.z };
+}
+const _n = new THREE.Vector3(), _cam = new THREE.Vector3();
+function facing(localDir) {
+  // world-space normal of the wedge anchor vs camera direction
+  _n.copy(localDir).transformDirection(brain.matrixWorld);
+  _cam.copy(camera.position).normalize();
+  return _n.dot(_cam);
+}
+
+// ── Animate (no auto-spin) ─────────────────────────────────────────────────
+let hoveredIdx = -1;
+(function animate() {
+  requestAnimationFrame(animate);
+
+  if (!isDragging) {
+    velY *= 0.90; velX *= 0.90;
+    if (Math.abs(velY) > 0.0001) brain.rotation.y += velY;
+    if (Math.abs(velX) > 0.0001)
+      brain.rotation.x = THREE.MathUtils.clamp(brain.rotation.x + velX, -1.0, 1.0);
+  }
+
+  raycaster.setFromCamera(mouse, camera);
+  brain.updateMatrixWorld();
+  const hits = raycaster.intersectObjects(meshes);
+  hoveredIdx = hits.length ? hits[0].object.userData.idx : -1;
+  document.getElementById('canvas-container').style.cursor = hoveredIdx >= 0 ? 'pointer' : 'grab';
+
+  wedges.forEach((wd, i) => {
+    if (!wd) return;
+    const active = (i === activeIdx);
+    const hot = active || (i === hoveredIdx);
+
+    // Stays in place — just lights up (no pop-out).
+    const accent = wd.mat.userData.accent;
+    wd.mat.color.lerp(hot ? accent : BEIGE, 0.16);
+    _emis.copy(accent).multiplyScalar(hot ? 0.28 : 0.0);
+    wd.mat.emissive.lerp(_emis, 0.16);
+  });
+
+  // Labels at region anchors (regions load async from the STL) — always visible.
+  labelEls.forEach((el, i) => {
+    const wd = wedges[i];
+    if (!wd) { el.style.opacity = '0'; el.style.pointerEvents = 'none'; return; }
+    const s = projectLocal(wd.anchor.clone().add(wd.grp.position));
+    const front = facing(wd.anchor) > -0.05;        // is the region toward the camera?
+    el.style.left = s.x + 'px';
+    el.style.top = s.y + 'px';
+    el.style.opacity = front ? '1' : '0.45';        // dim when its region faces away, never hidden
+    el.style.pointerEvents = 'auto';
+  });
+
+  renderer.render(scene, camera);
+})();
+</script>
+</body>
+</html>
