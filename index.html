@@ -499,6 +499,26 @@ const labelEls = lobes.map((l, i) => {
   return el;
 });
 
+// Leader lines + region dots (shown when a label is nudged off its region).
+const SVGNS = 'http://www.w3.org/2000/svg';
+const leaderSvg = document.createElementNS(SVGNS, 'svg');
+leaderSvg.setAttribute('style', 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:9;');
+document.body.appendChild(leaderSvg);
+const leaders = lobes.map((l) => {
+  const hexStr = '#' + l.hex.toString(16).padStart(6, '0');
+  const line = document.createElementNS(SVGNS, 'line');
+  line.setAttribute('stroke', 'rgba(0,0,0,0.35)');
+  line.setAttribute('stroke-width', '1');
+  const dot = document.createElementNS(SVGNS, 'circle');
+  dot.setAttribute('r', '3.5');
+  dot.setAttribute('fill', hexStr);
+  dot.setAttribute('stroke', 'rgba(255,255,255,0.7)');
+  dot.setAttribute('stroke-width', '1');
+  leaderSvg.appendChild(line);
+  leaderSvg.appendChild(dot);
+  return { line, dot };
+});
+
 // ── Panel logic ───────────────────────────────────────────────────────────
 const panel      = document.getElementById('panel');
 const panelTitle = document.getElementById('panel-title');
@@ -522,6 +542,7 @@ function openPanel(i) {
   });
   panel.classList.add('open');
   hintEl.style.opacity = '0';
+  faceRegion(i);                       // turn the brain so this region faces the camera
 }
 function closePanel() {
   panel.classList.remove('open');
@@ -536,7 +557,19 @@ let isDragging = false, moved = false;
 let prev = { x: 0, y: 0 };
 let velY = 0, velX = 0;
 
-function onDown(x, y) { isDragging = true; moved = false; prev = { x, y }; }
+// Auto-rotate target: turn the brain so a chosen region faces the camera.
+const faceTarget = { active: false, x: 0, y: 0 };
+function faceRegion(i) {
+  const wd = wedges[i];
+  if (!wd) return;
+  const a = wd.anchor.clone().normalize();
+  faceTarget.y = -Math.atan2(a.x, a.z);
+  faceTarget.x = THREE.MathUtils.clamp(Math.asin(THREE.MathUtils.clamp(a.y, -1, 1)) * 0.7, -0.7, 0.7);
+  faceTarget.active = true;
+  velX = velY = 0;
+}
+
+function onDown(x, y) { isDragging = true; moved = false; faceTarget.active = false; prev = { x, y }; }
 function onUp() { isDragging = false; }
 function onMove(x, y) {
   if (isDragging) {
@@ -596,7 +629,14 @@ let hoveredIdx = -1;
 (function animate() {
   requestAnimationFrame(animate);
 
-  if (!isDragging) {
+  if (faceTarget.active && !isDragging) {
+    // Smoothly turn the selected region toward the camera.
+    let dy = faceTarget.y - brain.rotation.y;
+    dy = Math.atan2(Math.sin(dy), Math.cos(dy));   // shortest way around
+    brain.rotation.y += dy * 0.12;
+    brain.rotation.x += (faceTarget.x - brain.rotation.x) * 0.12;
+    if (Math.abs(dy) < 0.005 && Math.abs(faceTarget.x - brain.rotation.x) < 0.005) faceTarget.active = false;
+  } else if (!isDragging) {
     velY *= 0.90; velX *= 0.90;
     if (Math.abs(velY) > 0.0001) brain.rotation.y += velY;
     if (Math.abs(velX) > 0.0001)
@@ -621,16 +661,58 @@ let hoveredIdx = -1;
     wd.mat.emissive.lerp(_emis, 0.16);
   });
 
-  // Labels at region anchors (regions load async from the STL) — always visible.
+  // Labels live in two columns flanking the brain; a leader line runs from
+  // each label to the region it marks.
+  const items = [];
   labelEls.forEach((el, i) => {
     const wd = wedges[i];
-    if (!wd) { el.style.opacity = '0'; el.style.pointerEvents = 'none'; return; }
+    if (!wd) { el.style.opacity = '0'; el.style.pointerEvents = 'none'; leaders[i].line.style.display = 'none'; leaders[i].dot.style.display = 'none'; return; }
     const s = projectLocal(wd.anchor.clone().add(wd.grp.position));
-    const front = facing(wd.anchor) > -0.05;        // is the region toward the camera?
-    el.style.left = s.x + 'px';
-    el.style.top = s.y + 'px';
-    el.style.opacity = front ? '1' : '0.45';        // dim when its region faces away, never hidden
-    el.style.pointerEvents = 'auto';
+    items.push({ i, el, ax: s.x, ay: s.y, front: facing(wd.anchor) > -0.05,
+                 w: el.offsetWidth || 120, h: el.offsetHeight || 26 });
+  });
+
+  const panelOpen = panel.classList.contains('open');
+  const rightEdge = (panelOpen ? window.innerWidth - 360 : window.innerWidth) - 24;
+  const leftEdge = 24;
+  const topBound = 210, botBound = window.innerHeight - 40, gap = 10;
+  const centerX = items.length ? items.reduce((s, it) => s + it.ax, 0) / items.length : window.innerWidth / 2;
+
+  // Split into a left and right column by which side of the brain each region is on.
+  const cols = { L: [], R: [] };
+  items.forEach(it => cols[it.ax < centerX ? 'L' : 'R'].push(it));
+
+  ['L', 'R'].forEach(side => {
+    const col = cols[side];
+    col.sort((a, b) => a.ay - b.ay);
+    for (let k = 0; k < col.length; k++) {                       // push down off overlaps
+      let y = col[k].ay;
+      if (k > 0) y = Math.max(y, col[k-1].ly + col[k-1].h/2 + gap + col[k].h/2);
+      col[k].ly = y;
+    }
+    for (let k = col.length - 1; k >= 0; k--) {                  // keep within bottom edge
+      let y = Math.min(col[k].ly, botBound - col[k].h/2);
+      if (k < col.length - 1) y = Math.min(y, col[k+1].ly - col[k+1].h/2 - gap - col[k].h/2);
+      col[k].ly = Math.max(y, topBound + col[k].h/2);
+    }
+    col.forEach(it => {
+      // Flush labels to the column edge (left edge at leftEdge / right edge at rightEdge).
+      it.lx = side === 'L' ? leftEdge + it.w/2 : rightEdge - it.w/2;
+      const el = it.el;
+      el.style.left = it.lx + 'px';
+      el.style.top = it.ly + 'px';
+      el.style.opacity = it.front ? '1' : '0.55';
+      el.style.pointerEvents = 'auto';
+
+      // Leader: from the region anchor to the label's inner edge.
+      const innerX = side === 'L' ? it.lx + it.w/2 : it.lx - it.w/2;
+      const ld = leaders[it.i];
+      ld.line.style.display = ld.dot.style.display = '';
+      ld.line.setAttribute('x1', it.ax); ld.line.setAttribute('y1', it.ay);
+      ld.line.setAttribute('x2', innerX); ld.line.setAttribute('y2', it.ly);
+      ld.dot.setAttribute('cx', it.ax);  ld.dot.setAttribute('cy', it.ay);
+      ld.line.style.opacity = ld.dot.style.opacity = it.front ? '0.9' : '0.45';
+    });
   });
 
   renderer.render(scene, camera);
